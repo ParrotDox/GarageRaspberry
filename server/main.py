@@ -4,7 +4,6 @@ Run from this directory with: uvicorn main:app --host 0.0.0.0 --port 8000
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import random
@@ -16,7 +15,8 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 APP_DIR = Path(__file__).resolve().parent
 LOG_FILE = Path(os.getenv("GARAGE_LOG_FILE", APP_DIR / "door_events.jsonl"))
@@ -35,6 +35,15 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Добавляем CORS для Android-клиента
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 state_lock = threading.RLock()
 state = {
     "status_code": 1,
@@ -43,6 +52,7 @@ state = {
     "motion_started": 0.0,
     "motion_duration": 4.0,
 }
+
 events: deque[dict] = deque(maxlen=MAX_LOGS)
 gpio_value = 0
 
@@ -72,6 +82,7 @@ def update_motion_locked() -> None:
     target = state["motion_target"]
     if target is None:
         return
+    
     elapsed = time.monotonic() - state["motion_started"]
     if elapsed >= state["motion_duration"]:
         old = state["status_code"]
@@ -109,15 +120,15 @@ def start_motion(target_status: int) -> None:
         state["status_code"] = 2
         state["motion_target"] = 1
         label = "закрывается"
+        
     state["motion_started"] = time.monotonic()
     state["motion_duration"] = 4.0
     append_event(f"Дверь {label} (статус {state['status_code']})")
 
 
 def apply_command(command: DoorCommand) -> None:
+    """Обработка программных команд от Android (API)."""
     with state_lock:
-        # The explicit action is authoritative; lock_enabled is also included
-        # by the Android client in every request.
         if command.action == "lock_on":
             state["lock_enabled"] = True
             append_event("Блокировка двери включена")
@@ -127,12 +138,12 @@ def apply_command(command: DoorCommand) -> None:
             append_event("Блокировка двери отключена")
             return
 
-        # Keep the server's lock state synchronized with the client setting.
+        # Синхронизируем состояние блокировки, если оно пришло от клиента
         state["lock_enabled"] = command.lock_enabled
+        
+        # ВАЖНО: Программное открытие/закрытие (через API) ВСЕГДА разрешено.
+        # Защита блокирует только РУЧНЫЕ попытки (через GPIO).
         if command.action == "open":
-            if state["lock_enabled"]:
-                append_event("Недопустимая попытка открытия двери: блокировка включена")
-                raise HTTPException(status_code=423, detail="Дверь заблокирована")
             start_motion(4)
         elif command.action == "close":
             start_motion(1)
@@ -167,36 +178,41 @@ def post_door_command(command: DoorCommand):
 
 @app.post("/api/gpio/signal")
 def simulate_gpio_signal(payload: dict):
-    """Optional API-based GPIO simulator: {"value": 0|1, "action": "open"}."""
+    """Эмуляция РУЧНОГО сигнала с GPIO (физическая кнопка/взлом)."""
     value = payload.get("value")
     if value not in (0, 1, False, True):
         raise HTTPException(status_code=422, detail="value должен быть 0 или 1")
+        
     global gpio_value
     gpio_value = int(value)
     action = payload.get("action", "open")
     append_event(f"GPIO: входной сигнал {gpio_value}")
+    
     if gpio_value == 1:
-        # A high signal represents a physical/manual opening attempt.
+        # Эмуляция ручной попытки открытия. Именно она блокируется защитой.
         with state_lock:
             if state["lock_enabled"]:
                 append_event("Недопустимая попытка открытия двери вручную: блокировка включена")
                 return {"accepted": False, "reason": "locked", "gpio_value": gpio_value}
-            append_event("Допустимая попытка открытия двери вручную")
-            if action == "close":
-                start_motion(1)
-            else:
-                start_motion(4)
+                
+        append_event("Допустимая попытка открытия двери вручную")
+        if action == "close":
+            start_motion(1)
+        else:
+            start_motion(4)
+            
     return {"accepted": True, "gpio_value": gpio_value}
 
 
 def keyboard_gpio_worker() -> None:
-    """Read console commands in a daemon thread: o=open attempt, c=close, r=random GPIO, q=quit."""
+    """Read console commands in a daemon thread."""
     print("\nЭмуляция GPIO: введите o=ручное открытие, c=закрыть, r=случайный сигнал, q=выход.", flush=True)
     while True:
         try:
-            command = input("GPIO> ").strip().lower()
+            command = input("GPIO > ").strip().lower()
         except (EOFError, OSError):
             return
+            
         if command == "q":
             print("Поток GPIO остановлен. Сам API продолжает работать.", flush=True)
             return
@@ -235,8 +251,6 @@ def load_existing_logs() -> None:
 @app.on_event("startup")
 async def startup_event() -> None:
     load_existing_logs()
-    # Console input is optional; on servers launched without an interactive
-    # terminal, the API and /api/gpio/signal endpoint still work.
     threading.Thread(target=keyboard_gpio_worker, daemon=True, name="gpio-keyboard").start()
     append_event("Сервер эмуляции гаражных ворот запущен")
 
