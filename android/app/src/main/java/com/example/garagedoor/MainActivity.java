@@ -44,6 +44,9 @@ public class MainActivity extends AppCompatActivity {
 
     // Флаг для предотвращения зацикливания при программном изменении Switch
     private boolean isUpdatingSwitch = false;
+    
+    // Отслеживание последнего обработанного timestamp для предотвращения спама уведомлений
+    private String lastProcessedTimestamp = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -186,7 +189,7 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(Call<DoorStatusResponse> call, Throwable t) {
-                // При опросе каждые 3 сек лучше молчать при временных обрывах сети, чтобы не спамить Toast'ами
+                // При опросе каждые 3 сек лучше молчать при временных обрывах сети
             }
         });
 
@@ -194,17 +197,32 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onResponse(Call<List<LogEntry>> call, Response<List<LogEntry>> response) {
                 if (response.isSuccessful() && response.body() != null) {
+                    List<LogEntry> logs = response.body();
                     StringBuilder sb = new StringBuilder();
-                    for (LogEntry entry : response.body()) {
+                    
+                    // Сервер отдает логи в порядке: самые новые первыми (индекс 0)
+                    for (LogEntry entry : logs) {
                         sb.append(entry.toString()).append("\n");
 
                         // Регистронезависимый поиск для гарантированного срабатывания тревоги
-                        if (entry.getEvent() != null && entry.getEvent().toLowerCase().contains("недопустимая попытка")) {
+                        // Проверяем только НОВЫЕ логи (timestamp > lastProcessedTimestamp)
+                        if (entry.getTimestamp() != null && 
+                            entry.getTimestamp().compareTo(lastProcessedTimestamp) > 0 &&
+                            entry.getEvent() != null && 
+                            entry.getEvent().toLowerCase().contains("недопустимая попытка")) {
                             triggerSecurityAlert(entry.getEvent());
                         }
                     }
+                    
                     tvLogs.setText(sb.toString());
-                    scrollLogs.post(() -> scrollLogs.fullScroll(View.FOCUS_DOWN));
+                    
+                    // Фикс 1: Прокручиваем в начало, чтобы новые логи были видны сверху
+                    scrollLogs.post(() -> scrollLogs.fullScroll(View.FOCUS_UP));
+                    
+                    // Фикс 2: Обновляем lastProcessedTimestamp самым свегим логом (первый в списке)
+                    if (!logs.isEmpty() && logs.get(0).getTimestamp() != null) {
+                        lastProcessedTimestamp = logs.get(0).getTimestamp();
+                    }
                 }
             }
 
@@ -246,6 +264,21 @@ public class MainActivity extends AppCompatActivity {
         }
 
         ObjectAnimator.ofFloat(garageDoor, "translationY", targetY).setDuration(1000).start();
+
+        // Фикс 3: Блокировка кнопок при движении двери
+        if (statusCode == 2 || statusCode == 3) {
+            // Дверь в движении — блокируем кнопки
+            btnOpen.setEnabled(false);
+            btnClose.setEnabled(false);
+            btnOpen.setAlpha(0.5f);
+            btnClose.setAlpha(0.5f);
+        } else {
+            // Дверь в конечном состоянии — разблокируем кнопки
+            btnOpen.setEnabled(true);
+            btnClose.setEnabled(true);
+            btnOpen.setAlpha(1.0f);
+            btnClose.setAlpha(1.0f);
+        }
     }
 
     private void triggerSecurityAlert(String alertDetails) {
