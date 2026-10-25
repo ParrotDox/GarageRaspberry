@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#121212"
+    android:padding="16dp">
+
+    <!-- Шапка с названием и иконкой шестеренки -->
+    <RelativeLayout
+        android:id="@+id/headerLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp">
+
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <!-- Иконка шестеренки (настройки) -->
+        <TextView
+            android:id="@+id/btnSettingsGear"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_alignParentEnd="true"
+            android:gravity="center"
+            android:text="⚙"
+            android:textColor="#FFFFFF"
+            android:textSize="24sp"
+            android:background="?attr/selectableItemBackgroundBorderless" />
+    </RelativeLayout>
+
+    <!-- Текстовый статус двери (1-4) -->
+    <TextView
+        android:id="@+id/tvStatusBadge"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/headerLayout"
+        android:layout_marginBottom="12dp"
+        android:gravity="center"
+        android:text="Статус: Загрузка..."
+        android:textColor="#FFC107"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <!-- Визуализация ворот -->
+    <FrameLayout
+        android:id="@+id/garageFrame"
+        android:layout_width="match_parent"
+        android:layout_height="160dp"
+        android:layout_below="@id/tvStatusBadge"
+        android:background="#1E1E1E">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="🚗 [ ГАРАЖ ]"
+            android:textColor="#4CAF50"
+            android:textSize="22sp" />
+
+        <View
+            android:id="@+id/garageDoor"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#37474F" />
+    </FrameLayout>
+
+    <!-- Панель управления -->
+    <LinearLayout
+        android:id="@+id/controlsLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/garageFrame"
+        android:layout_marginTop="16dp"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnOpen"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="@string/btn_open" />
+
+            <Button
+                android:id="@+id/btnClose"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/btn_close" />
+        </LinearLayout>
+
+        <Switch
+            android:id="@+id/switchLock"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Защита от несанкционированного доступа"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <!-- Журнал событий -->
+    <TextView
+        android:id="@+id/tvLogHeader"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/controlsLayout"
+        android:layout_marginTop="12dp"
+        android:text="Журнал событий сервера:"
+        android:textColor="#AAAAAA"
+        android:textSize="12sp" />
+
+    <ScrollView
+        android:id="@+id/scrollLogs"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/tvLogHeader"
+        android:layout_marginTop="6dp"
+        android:background="#000000"
+        android:padding="8dp">
+
+        <TextView
+            android:id="@+id/tvLogs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:textColor="#00FF00"
+            android:textSize="11sp" />
+    </ScrollView>
+
+</RelativeLayout>

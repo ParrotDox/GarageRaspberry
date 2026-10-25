@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Управление Гаражом</string>
+    <string name="status_closed">Состояние: ЗАКРЫТО</string>
+    <string name="status_opened">Состояние: ОТКРЫТО</string>
+    <string name="btn_open">Открыть ворота</string>
+    <string name="btn_close">Закрыть ворота</string>
+    <string name="lock_enabled">Защита: ВКЛЮЧЕНА</string>
+    <string name="lock_disabled">Защита: ВЫКЛЮЧЕНА</string>
+</resources>
